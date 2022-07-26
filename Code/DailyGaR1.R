@@ -25,9 +25,6 @@ library(sn)                # Skew-t distribution
 library(ggridges)
 library(ggpubr) # ggarrrange
 
-
-
-
 banner("Parte 1:", "Procesamiento de la base de datos", emph = TRUE)
 ###########################################################################
 ###########################################################################
@@ -37,7 +34,6 @@ banner("Parte 1:", "Procesamiento de la base de datos", emph = TRUE)
 ###                                                                     ###
 ###########################################################################
 ###########################################################################
-
 
 ########################################################
 
@@ -67,7 +63,7 @@ GDP_vintages = readxl::read_excel("Data/ROUTPUTQvQd.xlsx")
 rGDP_vintages = GDP_vintages %>% pivot_longer( names_to= "variable",
                                      values_to = "val", cols = -c("DATE")) %>% 
               dplyr::group_by(variable) %>% 
-              mutate(val=log(val/lag(val,1)*100)) %>% 
+              mutate(val=log(val/lag(val,1))*100) %>% 
               pivot_wider(names_from = "variable",values_from = "val")
 
 lrGDP_vintages = GDP_vintages %>% pivot_longer( names_to= "variable",
@@ -78,19 +74,16 @@ lrGDP_vintages = GDP_vintages %>% pivot_longer( names_to= "variable",
               mutate(val=lag(val,1)) %>% 
               pivot_wider(names_from = "variable",values_from = "val")
 
-
 rGDP_vintages = rGDP_vintages[161:296,c(89:145)] 
 rGDP_vintages = cbind(date,rGDP_vintages)
 
 lrGDP_vintages = lrGDP_vintages[161:296,c(89:145)] 
 lrGDP_vintages = cbind(date,lrGDP_vintages)
 
-
 # GDP latest vintage
 y=as.matrix(data$GDP)
 y=y[complete.cases(y)] 
 y=y[-4:-1] # 136 trimestres
-
 
 # ADS vintages
 
@@ -99,8 +92,6 @@ ADS_vintages = ADS_vintages[,-1]
 ADS_vintages=cbind("date"=data$date,ADS_vintages)
 ADS_vintages=cbind("q_n"=data$q_n,ADS_vintages)
 str(ADS_vintages)
-
-
 
 banner("Parte 2:", "Nowcasting ADS", emph = TRUE)
 ############################################################################
@@ -116,9 +107,13 @@ Tini=80 #2006-Q4
 Tbig=length(y)
 Ttau=Tbig-Tini+1  
 
+c(ISPREAD,EEFR,RET,SMB,HML,MOM,VXO,CSPREAD,TERM,TED,CISS)
 
-yMIDAS1<-data.frame(date=data[which(data$q_n>=Tini+4+1),"date"])
-yMIDAS1<-cbind(yMIDAS1,"q10"=NA)
+yMIDAS<-data.frame(date=data[which(data$q_n>=Tini+4+1),"date"])
+yMIDAS<-cbind(yMIDAS,"ISPREAD"=NA,"EEFR"=NA,"RET"=NA,"SMB"=NA
+              ,"HML"=NA,"MOM"=NA,"VXO"=NA,
+              "CSPREAD"=NA,"TERM"=NA,"TED"=NA,"CISS"=NA,
+              "ADS"=NA,"MOM"=NA)
 ADS_real<-data.frame(date=data[,"date"])
 ADS_real<-cbind(ADS_real,"ADS_real"=NA)
 GDP_real<-data.frame(date=date)
@@ -204,17 +199,15 @@ for (t in (Tini:(length(y)-1))){
     eq1=rq(gdp[1:(t)]~lgdp[1:(t)]+xm1[1:(t),],tau = c(0.10))
     
     # estimate at t+1
-    yMIDAS1[yMIDAS1$date==q_t_1[day],2]=c(1,lgdp[t+1],xm1[(t+1),])%*%eq1$coef
+    yMIDAS[yMIDAS$date==q_t_1[day],"ADS"]=c(1,lgdp[t+1],xm1[(t+1),])%*%eq1$coef
 
   }
 }
 
 
-plot(y=yMIDAS1$q10,x=yMIDAS1$date,t="l")
 
-
-# write.csv(yMIDAS4, file = paste0("Data/Realtime_MIDAS4",".csv"))
-# #  
+write.csv(yMIDAS_ADS, file = paste0("Data/Realtime_MIDAS4",".csv"))
+  
 
 
 
@@ -228,22 +221,15 @@ banner("Parte 3:", "Nowcasting financial indicators", emph = TRUE)
 ###########################################################################
 ###########################################################################
 
-Tini=87
+Tini=80 #2006-Q4
 Tbig=length(y)
 Ttau=Tbig-Tini+1  
 
 
-yMIDAS1<-data.frame(date=data[which(data$q_n>=Tini+4+1),"date"])
-yMIDAS1<-cbind(yMIDAS1,"q05"=NA,"q25"=NA,"q75"=NA,"q95"=NA)
-yMIDAS2<-data.frame(date=data[which(data$q_n>=Tini+4+1),"date"])
-yMIDAS2<-cbind(yMIDAS2,"q05"=NA,"q25"=NA,"q75"=NA,"q95"=NA)
-yMIDAS3<-data.frame(date=data[which(data$q_n>=Tini+4+1),"date"])
-yMIDAS3<-cbind(yMIDAS3,"q05"=NA,"q25"=NA,"q75"=NA,"q95"=NA)
 
-
-j=3
-#158
-for (varname in c("ISPREAD","VXO","CSPREAD")){
+g=2 # col GDP vintage init
+j=3 # col ADS vintage init
+for (varname in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM","TED","CISS")){
   
   for (t in (Tini:(length(y)-1))){
   
@@ -272,41 +258,24 @@ for (varname in c("ISPREAD","VXO","CSPREAD")){
     Q=Almon_lag(polydegree=3,C=ncol(fin_1))
     xm1=fin_1%*%t(Q)
     
-    ### Estimate regression at 
-    XX<-data.frame(cbind("y"=y[1:(t)],"V"=xm1[1:(t),])) # estimate at t
-    eq1=rq(y~.,data = XX[(1:t),],tau = c(0.05,0.25,0.75,0.95))
+    while (is.na(rGDP_vintages[t,g])){
+      g=g+1
+    }
+    gdp=rGDP_vintages[(1:t),g]
+    lgdp=lrGDP_vintages[1:(t+1),g]
     
-    XX<-data.frame(cbind("y"=y[1:(t+1)],"V"=xm1[1:(t+1),]))  # nowcast at t+1
-    fp=predict(eq1,newdata=XX[(1:t+1),], stepfun = TRUE)
-    a=rearrange(fp)
+    # estimate at t
+    eq1=rq(gdp[1:(t)]~lgdp[1:(t)]+xm1[1:(t),],tau = c(0.10))
     
-    if (varname=="ISPREAD"){
-    yMIDAS1[yMIDAS1$date==q_t_1[day],2]=environment(a[[paste0(t+1)]])[["y"]][2]+yspf[(t+1)]
-    yMIDAS1[yMIDAS1$date==q_t_1[day],3]=environment(a[[paste0(t+1)]])[["y"]][3]+yspf[(t+1)]
-    yMIDAS1[yMIDAS1$date==q_t_1[day],4]=environment(a[[paste0(t+1)]])[["y"]][4]+yspf[(t+1)]
-    yMIDAS1[yMIDAS1$date==q_t_1[day],5]=environment(a[[paste0(t+1)]])[["y"]][5]+yspf[(t+1)]
-    }else if (varname=="VXO"){
-      yMIDAS2[yMIDAS2$date==q_t_1[day],2]=environment(a[[paste0(t+1)]])[["y"]][2]+yspf[(t+1)]
-      yMIDAS2[yMIDAS2$date==q_t_1[day],3]=environment(a[[paste0(t+1)]])[["y"]][3]+yspf[(t+1)]
-      yMIDAS2[yMIDAS2$date==q_t_1[day],4]=environment(a[[paste0(t+1)]])[["y"]][4]+yspf[(t+1)]
-      yMIDAS2[yMIDAS2$date==q_t_1[day],5]=environment(a[[paste0(t+1)]])[["y"]][5]+yspf[(t+1)]}
-    else if (varname=="CSPREAD"){
-      yMIDAS3[yMIDAS3$date==q_t_1[day],2]=environment(a[[paste0(t+1)]])[["y"]][2]+yspf[(t+1)]
-      yMIDAS3[yMIDAS3$date==q_t_1[day],3]=environment(a[[paste0(t+1)]])[["y"]][3]+yspf[(t+1)]
-      yMIDAS3[yMIDAS3$date==q_t_1[day],4]=environment(a[[paste0(t+1)]])[["y"]][4]+yspf[(t+1)]
-      yMIDAS3[yMIDAS3$date==q_t_1[day],5]=environment(a[[paste0(t+1)]])[["y"]][5]+yspf[(t+1)]}
-    
+    # estimate at t+1
+    yMIDAS[yMIDAS$date==q_t_1[day],varname]=c(1,lgdp[t+1],xm1[(t+1),])%*%eq1$coef    
   }
 }
 }
 
 
 
-#write.csv(cbind("q_n"=data$q_n[data$q_n>=92],yMIDAS1), file = paste0("Data/Realtime_MIDAS1",".csv"))
-#write.csv(cbind("q_n"=data$q_n[data$q_n>=92],yMIDAS2), file = paste0("Data/Realtime_MIDAS2",".csv"))
-#write.csv(cbind("q_n"=data$q_n[data$q_n>=92],yMIDAS3), file = paste0("Data/Realtime_MIDAS3",".csv"))
-#write.csv(cbind("q_n"=data$q_n[data$q_n>=92],yMIDAS4), file = paste0("Data/Realtime_MIDAS4",".csv"))
-
+write.csv(cbind("q_n"=data$q_n[data$q_n>=85],yMIDAS), file = paste0("Data/Realtime_MIDAS",".csv"))
 
 
 banner("Parte 4:", "Benchmark", emph = TRUE)
