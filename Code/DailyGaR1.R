@@ -113,7 +113,7 @@ yMIDAS<-data.frame(date=data[which(data$q_n>=Tini+4+1),"date"])
 yMIDAS<-cbind(yMIDAS,"ISPREAD"=NA,"EEFR"=NA,"RET"=NA,"SMB"=NA
               ,"HML"=NA,"MOM"=NA,"VXO"=NA,
               "CSPREAD"=NA,"TERM"=NA,"TED"=NA,"CISS"=NA,
-              "ADS"=NA,"MOM"=NA)
+              "ADS"=NA)
 ADS_real<-data.frame(date=data[,"date"])
 ADS_real<-cbind(ADS_real,"ADS_real"=NA)
 GDP_real<-data.frame(date=date)
@@ -274,47 +274,9 @@ for (varname in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM
 }
 
 
-
-write.csv(cbind("q_n"=data$q_n[data$q_n>=85],yMIDAS), file = paste0("Data/Realtime_MIDAS",".csv"))
-
-
-banner("Parte 4:", "Benchmark", emph = TRUE)
-###########################################################################
-###########################################################################
-###                                                                     ###
-###                              PARTE 4:                               ###
-###                              BENCHMARK                              ###
-###                                                                     ###
-###########################################################################
-###########################################################################
-
-yb=matrix(nrow=Tbig-Tini,ncol=4)
+write.csv(cbind("q_n"=data$q_n[data$q_n>=85],yMIDAS), file = paste0("Data/nowcasting_MIDAS",".csv"))
 
 
-################################################################################
-############################ HORIZONTE #########################################
-################################################################################
-# 1/1/1992
 
-
-for (t in (Tini:(length(y)-1))){
-
-# Benchmark
-beta_b=rq(y[1:t]~1, tau = c(0.05,0.25,0.75,0.95))
-yb[(t-Tini+1),1]=beta_b$coef[1]+yspf[(t+1)]
-yb[(t-Tini+1),2]=beta_b$coef[2]+yspf[(t+1)]
-yb[(t-Tini+1),3]=beta_b$coef[3]+yspf[(t+1)]
-yb[(t-Tini+1),4]=beta_b$coef[4]+yspf[(t+1)]
-}
-
-write.csv(yb, file = paste0("Data/Realtime_benchmark",".csv"))
-
-
-############################################################################
-###                                                                      ###
-###                               PARTE 4:                               ###
-###                            MIDAS QUANTILE                            ###
-###                                                                      ###
-############################################################################
-############################################################################
-
+yMIDAS %>% pivot_longer(names_to = "nowcasts",values_to = "val",cols = -c(date)) %>% 
+  ggplot(aes(x=date,y=val,col=nowcasts))+geom_line()
