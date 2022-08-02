@@ -284,9 +284,9 @@ yLASSO<-merge.data.frame(yLASSO,GDP_real[,c("q_n","GDP_real")],by = "q_n")
 plot(yLASSO[,"GDP_real"],t="l")
 lines(yLASSO[,"CISS"],t="l",col ="blue")
 
-write.csv(yLASSO, file = paste0("Data/nowcasting_LASSO",".csv"))
+#write.csv(yLASSO, file = paste0("Data/nowcasting_LASSO",".csv"))
 
-write.csv(cbind("q_n"=data$q_n[data$q_n>=85],LASSO_select), file = paste0("Data/LASSO_select",".csv"))
+#write.csv(cbind("q_n"=data$q_n[data$q_n>=85],LASSO_select), file = paste0("Data/LASSO_select",".csv"))
 
 
 
