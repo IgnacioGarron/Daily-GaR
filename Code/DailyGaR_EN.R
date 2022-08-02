@@ -186,7 +186,7 @@ for (t in (Tini:(length(y)-1))){
     names(ADS_update_t_1)=c("q_n","date","ADS")
     fin_1=daily_matrix(data_d=ADS_update_t_1, #t+4 (1 year daily lags)
                        N_lag=93,data_names=c("ADS","q_n"),q_data=t+1)$daily
-    
+    fin_1=scale(fin_1)
     ### Estimate regression at t
     
     # GDP vintage at t
@@ -199,9 +199,12 @@ for (t in (Tini:(length(y)-1))){
     XX=cbind(rep(1,length(gdp)),lgdp,fin_1)
     # estimate at t
     #LAMBDA 2 FOR EN
-    lambda2_1=cv.glmnet(fin_s1,y)$lambda.min
+    lambda2_1=cv.glmnet(fin_1[1:(t),],gdp[1:(t)],alpha=0.5)$lambda.min
+    # X+
+    fin_1<-(1/sqrt(1+lambda2_1))*fin_1
+    lgdp<-(1/sqrt(1+lambda2_1))*lgdp
     
-    beta=rq(gdp[1:(t)]~lgdp[1:(t)]+fin_1[1:(t),], tau = 0.10,method = "lasso",lambda=LassoLambdaHat(XX[1:t,],alpha=0.90,tau=0.10))$coefficients
+    beta=rq(gdp[1:(t)]~lgdp[1:(t)]+fin_1[1:(t),], tau = 0.10,method = "lasso",lambda=(1/sqrt(1+lambda2_1))*LassoLambdaHat(XX[1:t,],alpha=0.10,tau=0.10))$coefficients
     
     II2=abs(beta[-2:-1])>10^{-3}
     EN_select[EN_select$date==q_t_1[day],"ADS"]=length(fin_1[1,abs(beta[-2:-1])>10^{-3}])
@@ -210,3 +213,6 @@ for (t in (Tini:(length(y)-1))){
     
   }
 }
+
+
+?cv.glmnet
