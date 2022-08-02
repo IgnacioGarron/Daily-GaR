@@ -18,4 +18,4 @@ summary(plot[,-c(1,2,3)])
 plot[,-c(1)] %>% pivot_longer(names_to = "Variables",values_to = "val",cols = -c(date,q_n)) %>% 
   ggplot(aes(x = date, y =val,col=Variables )) + geom_line() + facet_wrap(~Variables)+
   theme_bw() + 
-  labs(x="", y="", title = "") 
+  labs(x="", y="", title = "") + theme(legend.position="bottom")
