@@ -198,7 +198,7 @@ for (t in (Tini:(length(y)-1))){
     
     XX=cbind(rep(1,length(gdp)),lgdp,fin_1)
     # estimate at t
-    beta=rq(gdp[1:(t)]~lgdp[1:(t)]+fin_1[1:(t),], tau = 0.10,method = "lasso",lambda=LassoLambdaHat(XX[1:t,],alpha=0.90,tau=0.10))$coefficients
+    beta=rq(gdp[1:(t)]~lgdp[1:(t)]+fin_1[1:(t),], tau = 0.10,method = "lasso",lambda=LassoLambdaHat(XX[1:t,],alpha=0.10,tau=0.10))$coefficients
     
     II2=abs(beta[-2:-1])>10^{-3}
     LASSO_select[LASSO_select$date==q_t_1[day],"ADS"]=length(fin_1[1,abs(beta[-2:-1])>10^{-3}])
@@ -264,7 +264,7 @@ for (varname in c("TERM","TED","CISS")){
       
       XX=cbind(rep(1,length(gdp)),lgdp,fin_1)
       # estimate at t
-      beta=rq(gdp[1:(t)]~lgdp[1:(t)]+fin_1[1:(t),], tau = 0.10,method = "lasso",lambda=LassoLambdaHat(XX[1:t,],alpha=0.90,tau=0.10))$coefficients
+      beta=rq(gdp[1:(t)]~lgdp[1:(t)]+fin_1[1:(t),], tau = 0.10,method = "lasso",lambda=LassoLambdaHat(XX[1:t,],alpha=0.10,tau=0.10))$coefficients
       
       II2=abs(beta[-2:-1])>10^{-3}
       LASSO_select[LASSO_select$date==q_t_1[day],varname]=length(fin_1[1,abs(beta[-2:-1])>10^{-3}])
