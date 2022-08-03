@@ -112,7 +112,7 @@ Ttau=Tbig-Tini+1
 c(ISPREAD,EEFR,RET,SMB,HML,MOM,VXO,CSPREAD,TERM,TED,CISS)
 
 yEN<-data.frame(date=data[which(data$q_n>=Tini+4+1),"date"])
-yEN<-cbind(yLASSO,"ISPREAD"=NA,"EEFR"=NA,"RET"=NA,"SMB"=NA
+yEN<-cbind(yEN,"ISPREAD"=NA,"EEFR"=NA,"RET"=NA,"SMB"=NA
               ,"HML"=NA,"MOM"=NA,"VXO"=NA,
               "CSPREAD"=NA,"TERM"=NA,"TED"=NA,"CISS"=NA,
               "ADS"=NA)
@@ -141,10 +141,10 @@ for (t in (1:(length(y)+4))){
 g=2
 for (t in (1:length(y))){   
   ##incorporating latest vintage of GDP
-  while (is.na(GDP_vintages[t,g])){
+  while (is.na(rGDP_vintages[t,g])){
     g=g+1
   }
-  GDP_real[t,2]=GDP_vintages[t,g]
+  GDP_real[t,2]=rGDP_vintages[t,g]
 }
 
 plot(GDP_real$GDP_real,t="l")
@@ -157,8 +157,7 @@ g=2 # col GDP vintage init
 j=3 # col ADS vintage init
 #158
 #for (t in (130:(length(y)-1))){
-for (t in 130){  
-  #for (t in (Tini:Tini)){
+for (t in (Tini:(length(y)-1))){
   
   #matching daily dates for nowcast
   q_t = data[which(data$q_n==(t+4)),"date"]
@@ -205,9 +204,16 @@ for (t in 130){
     O=rep(0,ncol(XX))
     y_plus=c(gdp,O)
     x_plus=rbind(XX[1:t,],I)*(1/sqrt(1+lambda2))
-    lambda1=(1/sqrt(1+lambda2_1))*lambda.BC(XX[1:t,],c = 1,alpha=0.10,tau=0.10)
+    lambda1=(1/sqrt(1+lambda2))*lambda.BC(XX[1:t,],c = 1,alpha=0.10,tau=0.10)
     
-    beta=rq(y_plus ~ x_plus, tau = 0.10,method = "lasso",lambda=lambda1)$coefficients
+#    lambdalasso=lambda.BC(XX[1:t,],c = 1,alpha=0.10,tau=0.10)
+    
+    #LASSO
+ #   beta=rq(gdp[1:t] ~ lgdp[1:t]+fin_1[1:t,], tau = 0.10,method = "lasso",lambda=lambdalasso)$coefficients
+#    length(fin_1[1,abs(beta[-2:-1])>10^{-6}])
+    
+    #EN
+    beta=rqss(y_plus ~ x_plus, tau = 0.10,method = "lasso",lambda=lambda1)$coefficients
     beta=beta*sqrt(1+lambda2)
     II2=abs(beta[-2:-1])>10^{-6} #sam4e as Belloni and Cherno (2011)
     EN_select[EN_select$date==q_t_1[day],"ADS"]=length(fin_1[1,abs(beta[-2:-1])>10^{-6}])
@@ -239,9 +245,9 @@ Ttau=Tbig-Tini+1
 
 g=2 # col GDP vintage init
 j=3 # col ADS vintage init
-#for (varname in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM","TED","CISS")){
+for (varname in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM","TED","CISS")){
 
-for (varname in c("TERM","TED","CISS")){
+#for (varname in c("TERM","TED","CISS")){
   
   for (t in (Tini:(length(y)-1))){
     
@@ -282,8 +288,15 @@ for (varname in c("TERM","TED","CISS")){
       O=rep(0,ncol(XX))
       y_plus=c(gdp,O)
       x_plus=rbind(XX[1:t,],I)*(1/sqrt(1+lambda2))
-      lambda1=(1/sqrt(1+lambda2_1))*lambda.BC(XX[1:t,],c = 1,alpha=0.10,tau=0.10)
+      lambda1=(1/sqrt(1+lambda2))*lambda.BC(XX[1:t,],c = 1,alpha=0.10,tau=0.10)
       
+      #    lambdalasso=lambda.BC(XX[1:t,],c = 1,alpha=0.10,tau=0.10)
+      
+      #LASSO
+      #   beta=rq(gdp[1:t] ~ lgdp[1:t]+fin_1[1:t,], tau = 0.10,method = "lasso",lambda=lambdalasso)$coefficients
+      #    length(fin_1[1,abs(beta[-2:-1])>10^{-6}])
+      
+      #EN
       beta=rq(y_plus ~ x_plus, tau = 0.10,method = "lasso",lambda=lambda1)$coefficients
       beta=beta*sqrt(1+lambda2)
       II2=abs(beta[-2:-1])>10^{-6} #sam4e as Belloni and Cherno (2011)
@@ -296,12 +309,21 @@ for (varname in c("TERM","TED","CISS")){
 }
 
 
-yEN<-cbind("q_n"=data$q_n[data$q_n>=85],yEN)
-GDP_real<-cbind("q_n" = seq(85,140),GDP_real[81:136,])
-yEN<-merge.data.frame(yEN,GDP_real[,c("q_n","GDP_real")],by = "q_n")
-
+#yEN<-cbind("q_n"=data$q_n[data$q_n>=85],yEN)
+#GDP_real<-cbind("q_n" = seq(85,140),GDP_real[81:136,])
+#yEN<-merge.data.frame(yEN,GDP_real[,c("q_n","GDP_real")],by = "q_n")
 
 plot(EN_select[,"ADS"])
+
+
+plot(yEN[,"ADS"],t="l")
+lines(yEN[,"GDP_real"],t="l",col ="blue")
+
+
+write.csv(yEN, file = paste0("Data/nowcasting_EN",".csv"))
+
+#write.csv(y, file = paste0("Data/nowcasting_LASSO",".csv"))
+
 
 plot(yLASSO[,"GDP_real"],t="l")
 lines(yLASSO[,"CISS"],t="l",col ="blue")
