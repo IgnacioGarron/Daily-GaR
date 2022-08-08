@@ -8,5 +8,5 @@ lambda.BC<- function(X, R = 1000, tau = 0.1, c = 1, alpha = .10){
   U <- matrix(runif(n * R),n)
   R <- (t(X) %*% (tau - (U < tau)))/(sigs*sqrt(tau*(1-tau)))
   r <- apply(abs(R),2,max)
-  c * quantile(r, 1 - alpha) * sqrt(tau*(1-tau))*c(1,sigs)/n
+  c * quantile(r, 1 - alpha) * sqrt(tau*(1-tau))*c(1,sigs)
 }
