@@ -4,24 +4,19 @@
 
 library(stats)
 library(quantreg)
-library(nlme)
 library(grDevices)
 #library(sROC)
 library(quadprog)
 library(psych)
 library(forecast)
-library(lars)
 library(elasticnet)
 library(glmnet)
 library(normtest)
-library(latex2exp)
 library(readxl)            # read excel
 library(tidyverse)
 library(bannerCommenter) # Baners
 library(GAS) # backtesting VaR
 library(bayesQR)
-library(fitdistrplus)      # Package to fit parametric distributions
-library(sn)                # Skew-t distribution
 library(ggridges)
 library(ggpubr) # ggarrrange
 
@@ -44,6 +39,8 @@ seed_n<-12345
 
 source("Code/almon_lag.R") # Almon Lag with two end point restrictions as in Mogliani and Simoni (2021)
 source("Code/dailymatrix.R") # Almon Lag with two end point restrictions as in Mogliani and Simoni (2021)
+source("Code/lambda_lasso.R") # Lambda lasso
+
 
 ####### Quarterly GDP Data Import #######
 
@@ -93,6 +90,9 @@ ADS_vintages=cbind("date"=data$date,ADS_vintages)
 ADS_vintages=cbind("q_n"=data$q_n,ADS_vintages)
 str(ADS_vintages)
 
+
+LASSO_select<-read_csv("Data/LASSO_select.csv")
+
 banner("Parte 2:", "Nowcasting ADS", emph = TRUE)
 ############################################################################
 ############################################################################
@@ -120,6 +120,13 @@ ADS_real<-data.frame(date=data[,"date"])
 ADS_real<-cbind(ADS_real,"ADS_real"=NA)
 GDP_real<-data.frame(date=date)
 GDP_real<-cbind(GDP_real,"GDP_real"=NA)
+lasso_lags<-list()
+for (i in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO",
+     "CSPREAD","TERM","TED","CISS",
+     "ADS")){
+  lasso_lags[[i]]<-data.frame(matrix(nrow=1,ncol=2))
+  colnames(lasso_lags[[i]])<-c("date","lag")
+}
 
 #### Real time ADS
 
@@ -196,17 +203,38 @@ for (t in (Tini:(length(y)-1))){
     gdp=rGDP_vintages[(1:t),g]
     lgdp=scale(lrGDP_vintages[1:(t+1),g])
     
-    XX=cbind(rep(1,length(gdp)),lgdp,fin_1)
-    # estimate at t
-    beta=rq(gdp[1:(t)]~lgdp[1:(t)]+fin_1[1:(t),], tau = 0.10,method = "lasso",lambda=LassoLambdaHat(XX[1:t,],alpha=0.10,tau=0.10))$coefficients
+    XX=cbind(rep(1,length(gdp)),fin_1[1:(t),])
+    XX=fin_1[1:(t),]
     
-    II2=abs(beta[-2:-1])>10^{-3}
-    LASSO_select[LASSO_select$date==q_t_1[day],"ADS"]=length(fin_1[1,abs(beta[-2:-1])>10^{-3}])
+    # estimate at t penalized LASSO
+    lambdalasso=lambda.BC(fin_1[1:t,],c = 1,alpha=0.10,tau=0.10)
+    beta_lasso=rqss(gdp~XX, tau = 0.10,method = "lasso",lambda=lambdalasso)$coefficients
+    Lasso_I=abs(beta_lasso[-1])>10^{-6}
+    LASSO_select[LASSO_select$date==q_t_1[day],"ADS"]=length(fin_1[1,abs(beta_lasso[-1])>10^{-6}])
+    # post-penalized LASSO
+    beta=rq(gdp[1:(t)]~lgdp[1:t]+as.matrix(subset(fin_1[1:t,],select=Lasso_I)), tau = 0.10)$coefficients
     # estimate at t+1
-    yLASSO[yLASSO$date==q_t_1[day],"ADS"]=c(beta[1:2],beta[-2:-1][II2])%*%c(1,lgdp[t+1],as.matrix(subset(fin_1,select=II2))[(t+1),])
-    
+    yLASSO[yLASSO$date==q_t_1[day],"ADS"]=beta%*%c(1,lgdp[t+1],as.matrix(subset(fin_1,select=Lasso_I))[(t+1),])
   }
+
+  gg=data.frame(cbind("date"=q_t[day],"lag"=-which(abs(beta_lasso[-1])>10^{-6})+ncol(fin_1)))
+  gg$date=as.Date(gg$date,origin="1970-1-1")
+  lasso_lags[["ADS"]]=rbind(lasso_lags[["ADS"]],gg)
 }
+
+
+
+lasso_lags[["ADS"]] %>%  ggplot(aes(x = as.Date(date,origin="1970-1-1"), y = lag))+ geom_point()
+
+lasso_lags[["ADS"]] %>%  ggplot()+
+  geom_bar(aes(x = lag, fill = as.Date(date,origin="1970-1-1")), position = "dodge", stat = "count") 
+
+#save(lasso_lags,file = "Data/lasso_lags.RData")
+
+#write.csv(yLASSO, file = paste0("Data/nowcasting_LASSO",".csv"))
+
+#write.csv(LASSO_select, file = paste0("Data/EN_LASSO",".csv"))
+
 
 
 
@@ -220,6 +248,7 @@ banner("Parte 3:", "Nowcasting financial indicators", emph = TRUE)
 ###########################################################################
 ###########################################################################
 
+
 Tini=80 #2006-Q4
 Tbig=length(y)
 Ttau=Tbig-Tini+1  
@@ -227,10 +256,10 @@ Ttau=Tbig-Tini+1
 
 g=2 # col GDP vintage init
 j=3 # col ADS vintage init
-#for (varname in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM","TED","CISS")){
-
-for (varname in c("TERM","TED","CISS")){
-
+for (varname in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM","TED","CISS")){
+  
+  #for (varname in c("TERM","TED","CISS")){
+  
   for (t in (Tini:(length(y)-1))){
     
     #matching daily dates for nowcast
@@ -262,31 +291,25 @@ for (varname in c("TERM","TED","CISS")){
       gdp=rGDP_vintages[(1:t),g]
       lgdp=scale(lrGDP_vintages[1:(t+1),g])
       
-      XX=cbind(rep(1,length(gdp)),lgdp,fin_1)
-      # estimate at t
-      beta=rq(gdp[1:(t)]~lgdp[1:(t)]+fin_1[1:(t),], tau = 0.10,method = "lasso",lambda=LassoLambdaHat(XX[1:t,],alpha=0.10,tau=0.10))$coefficients
+      XX=cbind(rep(1,length(gdp)),fin_1[1:(t),])
+      XX=fin_1[1:(t),]
       
-      II2=abs(beta[-2:-1])>10^{-3}
-      LASSO_select[LASSO_select$date==q_t_1[day],varname]=length(fin_1[1,abs(beta[-2:-1])>10^{-3}])
+      # estimate at t penalized LASSO
+      lambdalasso=lambda.BC(fin_1[1:t,],c = 1,alpha=0.10,tau=0.10)
+      beta_lasso=rqss(gdp~XX, tau = 0.10,method = "lasso",lambda=lambdalasso)$coefficients
+      Lasso_I=abs(beta_lasso[-1])>10^{-6}
+      LASSO_select[LASSO_select$date==q_t_1[day],varname]=length(fin_1[1,abs(beta_lasso[-1])>10^{-6}])
+      # post-penalized LASSO
+      beta=rq(gdp[1:(t)]~lgdp[1:t]+as.matrix(subset(fin_1[1:t,],select=Lasso_I)), tau = 0.10)$coefficients
       # estimate at t+1
-      yLASSO[yLASSO$date==q_t_1[day],varname]=c(beta[1:2],beta[-2:-1][II2])%*%c(1,lgdp[t+1],as.matrix(subset(fin_1,select=II2))[(t+1),])
-      
+      yLASSO[yLASSO$date==q_t_1[day],varname]=beta%*%c(1,lgdp[t+1],as.matrix(subset(fin_1,select=Lasso_I))[(t+1),])
     }
+    
+    gg=data.frame(cbind("date"=q_t[day],"lag"=-which(abs(beta_lasso[-1])>10^{-6})+ncol(fin_1)))
+    gg$date=as.Date(gg$date,origin="1970-1-1")
+    lasso_lags[[varname]]=rbind(lasso_lags[[varname]],gg)
   }
 }
-
-
-
-yLASSO<-cbind("q_n"=data$q_n[data$q_n>=85],yLASSO)
-GDP_real<-cbind("q_n" = seq(85,140),GDP_real[81:136,])
-yLASSO<-merge.data.frame(yLASSO,GDP_real[,c("q_n","GDP_real")],by = "q_n")
-
-plot(yLASSO[,"GDP_real"],t="l")
-lines(yLASSO[,"CISS"],t="l",col ="blue")
-
-#write.csv(yLASSO, file = paste0("Data/nowcasting_LASSO",".csv"))
-
-#write.csv(cbind("q_n"=data$q_n[data$q_n>=85],LASSO_select), file = paste0("Data/LASSO_select",".csv"))
 
 
 
