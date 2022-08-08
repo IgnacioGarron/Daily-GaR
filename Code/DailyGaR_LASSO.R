@@ -210,6 +210,8 @@ for (t in (Tini:(length(y)-1))){
     lambdalasso=lambda.BC(fin_1[1:t,],c = 1,alpha=0.10,tau=0.10)
     beta_lasso=rqss(gdp~XX, tau = 0.10,method = "lasso",lambda=lambdalasso)$coefficients
     Lasso_I=abs(beta_lasso[-1])>10^{-6}
+    if (length(fin_1[1,abs(beta_lasso[-1])>10^{-6}])==0){
+      Lasso_I=rank(abs(beta_lasso[-1]))<2 } # in case it does not select any
     LASSO_select[LASSO_select$date==q_t_1[day],"ADS"]=length(fin_1[1,abs(beta_lasso[-1])>10^{-6}])
     # post-penalized LASSO
     beta=rq(gdp[1:(t)]~lgdp[1:t]+as.matrix(subset(fin_1[1:t,],select=Lasso_I)), tau = 0.10)$coefficients
@@ -217,11 +219,10 @@ for (t in (Tini:(length(y)-1))){
     yLASSO[yLASSO$date==q_t_1[day],"ADS"]=beta%*%c(1,lgdp[t+1],as.matrix(subset(fin_1,select=Lasso_I))[(t+1),])
   }
 
-  gg=data.frame(cbind("date"=q_t[day],"lag"=-which(abs(beta_lasso[-1])>10^{-6})+ncol(fin_1)))
+  gg=data.frame(cbind("date"=q_t[day],"lag"=-which(Lasso_I)+ncol(fin_1)))
   gg$date=as.Date(gg$date,origin="1970-1-1")
   lasso_lags[["ADS"]]=rbind(lasso_lags[["ADS"]],gg)
 }
-
 
 
 lasso_lags[["ADS"]] %>%  ggplot(aes(x = as.Date(date,origin="1970-1-1"), y = lag))+ geom_point()
@@ -229,11 +230,8 @@ lasso_lags[["ADS"]] %>%  ggplot(aes(x = as.Date(date,origin="1970-1-1"), y = lag
 lasso_lags[["ADS"]] %>%  ggplot()+
   geom_bar(aes(x = lag, fill = as.Date(date,origin="1970-1-1")), position = "dodge", stat = "count") 
 
-#save(lasso_lags,file = "Data/lasso_lags.RData")
-
-#write.csv(yLASSO, file = paste0("Data/nowcasting_LASSO",".csv"))
-
-#write.csv(LASSO_select, file = paste0("Data/EN_LASSO",".csv"))
+LASSO_select %>%  ggplot()+
+  geom_bar(aes(x = lag, fill = as.Date(date,origin="1970-1-1")), position = "dodge", stat = "count") 
 
 
 
@@ -254,23 +252,25 @@ Tbig=length(y)
 Ttau=Tbig-Tini+1  
 
 
+#for (varname in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM","TED","CISS")){
+
+for (varname in c("CSPREAD")){
+  
 g=2 # col GDP vintage init
 j=3 # col ADS vintage init
-for (varname in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM","TED","CISS")){
-  
-  #for (varname in c("TERM","TED","CISS")){
-  
+ 
+   
   for (t in (Tini:(length(y)-1))){
     
     #matching daily dates for nowcast
     q_t = data[which(data$q_n==(t+4)),"date"]
     q_t_1 = data[which(data$q_n==(t+4+1)),"date"]
     k=length(q_t_1)-length(q_t)
-    if (k==1){q_t=c(q_t,q_t[length(q_t)])}
-    else if (k==2){q_t=c(q_t,q_t[length(q_t)-1],q_t[length(q_t)])}
-    else if (k==3){q_t=c(q_t,q_t[length(q_t)-2],q_t[length(q_t)-1],q_t[length(q_t)])}
-    else if (k==-1){q_t=q_t[-length(q_t)]}
-    else if (k==-2){q_t=q_t[-(length(q_t)-1):-length(q_t)]}
+    if (k==1){q_t=c(q_t,q_t[length(q_t)])
+    }else if (k==2){q_t=c(q_t,q_t[length(q_t)-1],q_t[length(q_t)])
+    }else if (k==3){q_t=c(q_t,q_t[length(q_t)-2],q_t[length(q_t)-1],q_t[length(q_t)])
+    }else if (k==-1){q_t=q_t[-length(q_t)]
+    }else if (k==-2){q_t=q_t[-(length(q_t)-1):-length(q_t)]}
     print(k)
     print(q_t[length(q_t)])
     #print(length(q_t))
@@ -298,19 +298,26 @@ for (varname in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM
       lambdalasso=lambda.BC(fin_1[1:t,],c = 1,alpha=0.10,tau=0.10)
       beta_lasso=rqss(gdp~XX, tau = 0.10,method = "lasso",lambda=lambdalasso)$coefficients
       Lasso_I=abs(beta_lasso[-1])>10^{-6}
+      if (length(fin_1[1,abs(beta_lasso[-1])>10^{-6}])==0){
+      Lasso_I=rank(abs(beta_lasso[-1]))<2 } # in case it does not select any
       LASSO_select[LASSO_select$date==q_t_1[day],varname]=length(fin_1[1,abs(beta_lasso[-1])>10^{-6}])
       # post-penalized LASSO
       beta=rq(gdp[1:(t)]~lgdp[1:t]+as.matrix(subset(fin_1[1:t,],select=Lasso_I)), tau = 0.10)$coefficients
       # estimate at t+1
       yLASSO[yLASSO$date==q_t_1[day],varname]=beta%*%c(1,lgdp[t+1],as.matrix(subset(fin_1,select=Lasso_I))[(t+1),])
-    }
-    
-    gg=data.frame(cbind("date"=q_t[day],"lag"=-which(abs(beta_lasso[-1])>10^{-6})+ncol(fin_1)))
+      }
+    gg=data.frame(cbind("date"=q_t[day],"lag"=-which(Lasso_I)+ncol(fin_1)))
     gg$date=as.Date(gg$date,origin="1970-1-1")
     lasso_lags[[varname]]=rbind(lasso_lags[[varname]],gg)
   }
 }
 
 
+#yEN<-cbind("q_n"=data$q_n[data$q_n>=85],yEN)
+#GDP_real<-cbind("q_n" = seq(85,140),GDP_real[81:136,])
+#yEN<-merge.data.frame(yEN,GDP_real[,c("q_n","GDP_real")],by = "q_n")
 
+save(lasso_lags,file = "Data/lasso_lags.RData")
+write.csv(yLASSO, file = paste0("Data/nowcasting_LASSO",".csv"))
+write.csv(LASSO_select, file = paste0("Data/EN_LASSO",".csv"))
 
