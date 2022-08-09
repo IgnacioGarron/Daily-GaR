@@ -272,9 +272,7 @@ for (varname in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM
 }
 
 yMIDAS<-cbind("q_n"=data$q_n[data$q_n>=85],yMIDAS)
-
 GDP_real<-cbind("q_n" = seq(85,140),GDP_real[81:136,])
-
 yMIDAS<-merge.data.frame(yMIDAS,GDP_real[,c("q_n","GDP_real")],by = "q_n")
 
 write.csv(yMIDAS, file = paste0("Data/nowcasting_MIDAS",".csv"))
