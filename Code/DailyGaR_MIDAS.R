@@ -225,9 +225,10 @@ Ttau=Tbig-Tini+1
 
 
 
-g=2 # col GDP vintage init
-j=3 # col ADS vintage init
 for (varname in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM","TED","CISS")){
+  
+  g=2 # col GDP vintage init
+  j=3 # col ADS vintage init
   
   for (t in (Tini:(length(y)-1))){
   
