@@ -91,14 +91,13 @@ ADS_vintages=cbind("q_n"=data$q_n,ADS_vintages)
 str(ADS_vintages)
 
 
-LASSO_select<-read_csv("Data/LASSO_select.csv")
 
-banner("Parte 2:", "Nowcasting ADS", emph = TRUE)
+banner("Parte 2:", "Nowcasting GaR LASSO", emph = TRUE)
 ############################################################################
 ############################################################################
 ###                                                                      ###
 ###                               PARTE 2:                               ###
-###                            NOWCASTING ADS                            ###
+###                         NOWCASTING GAR LASSO                         ###
 ###                                                                      ###
 ############################################################################
 ############################################################################
@@ -107,7 +106,6 @@ Tini=80 #2006-Q4
 Tbig=length(y)
 Ttau=Tbig-Tini+1  
 
-c(ISPREAD,EEFR,RET,SMB,HML,MOM,VXO,CSPREAD,TERM,TED,CISS)
 
 yLASSO<-data.frame(date=data[which(data$q_n>=Tini+4+1),"date"])
 yLASSO<-cbind(yLASSO,"ISPREAD"=NA,"EEFR"=NA,"RET"=NA,"SMB"=NA
@@ -155,110 +153,12 @@ for (t in (1:length(y))){
 
 plot(GDP_real$GDP_real,t="l")
 
-#write.csv(ADS_real, file = paste0("Data/ADS_real",".csv"))
-
-#### Nowcasting for ADS
-
-g=2 # col GDP vintage init
-j=3 # col ADS vintage init
-#158
-for (t in (Tini:(length(y)-1))){
-
-#for (t in (Tini:Tini)){
- 
-  #matching daily dates for nowcast
-  q_t = data[which(data$q_n==(t+4)),"date"]
-  q_t_1 = data[which(data$q_n==(t+4+1)),"date"]
-  k=length(q_t_1)-length(q_t)
-  if (k==1){q_t=c(q_t,q_t[length(q_t)])}
-  else if (k==2){q_t=c(q_t,q_t[length(q_t)-1],q_t[length(q_t)])}
-  else if (k==3){q_t=c(q_t,q_t[length(q_t)-2],q_t[length(q_t)-1],q_t[length(q_t)])}
-  else if (k==-1){q_t=q_t[-length(q_t)]}
-  else if (k==-2){q_t=q_t[-(length(q_t)-1):-length(q_t)]}
-  print(k)
-  print(q_t[length(q_t)])
-  #print(length(q_t))
-  print(q_t_1[length(q_t_1)])
-  #print(length(q_t_1))
-  print(length(q_t_1)-length(q_t))
-  #matching daily dates for nowcasting
-  for (day in 1:length(q_t)){
-    ### Create daily matrix
-    ##incorporating latest vintage
-    ### Create daily matrix
-    while (is.na(ADS_vintages[which(ADS_vintages$date==q_t_1[day]),j])){
-      j=j+1
-    }
-    ADS_update_t_1=ADS_vintages[which(ADS_vintages$date<=q_t_1[day]),c(1,2,j)]
-    names(ADS_update_t_1)=c("q_n","date","ADS")
-    fin_1=daily_matrix(data_d=ADS_update_t_1, #t+4 (1 year daily lags)
-                       N_lag=93,data_names=c("ADS","q_n"),q_data=t+1)$daily
-    fin_1=scale(fin_1)
-    ### Estimate regression at t
-    
-    # GDP vintage at t
-    while (is.na(rGDP_vintages[t,g])){
-      g=g+1
-    }
-    gdp=rGDP_vintages[(1:t),g]
-    lgdp=scale(lrGDP_vintages[1:(t+1),g])
-    
-    XX=cbind(rep(1,length(gdp)),fin_1[1:(t),])
-    XX=fin_1[1:(t),]
-    
-    # estimate at t penalized LASSO
-    lambdalasso=lambda.BC(fin_1[1:t,],c = 1,alpha=0.10,tau=0.10)
-    beta_lasso=rqss(gdp~XX, tau = 0.10,method = "lasso",lambda=lambdalasso)$coefficients
-    Lasso_I=abs(beta_lasso[-1])>10^{-6}
-    if (length(fin_1[1,abs(beta_lasso[-1])>10^{-6}])==0){
-      Lasso_I=rank(abs(beta_lasso[-1]))<2 } # in case it does not select any
-    LASSO_select[LASSO_select$date==q_t_1[day],"ADS"]=length(fin_1[1,abs(beta_lasso[-1])>10^{-6}])
-    # post-penalized LASSO
-    beta=rq(gdp[1:(t)]~lgdp[1:t]+as.matrix(subset(fin_1[1:t,],select=Lasso_I)), tau = 0.10)$coefficients
-    # estimate at t+1
-    yLASSO[yLASSO$date==q_t_1[day],"ADS"]=beta%*%c(1,lgdp[t+1],as.matrix(subset(fin_1,select=Lasso_I))[(t+1),])
-  }
-
-  gg=data.frame(cbind("date"=q_t[day],"lag"=-which(Lasso_I)+ncol(fin_1)))
-  gg$date=as.Date(gg$date,origin="1970-1-1")
-  lasso_lags[["ADS"]]=rbind(lasso_lags[["ADS"]],gg)
-}
 
 
-lasso_lags[["ADS"]] %>%  ggplot(aes(x = as.Date(date,origin="1970-1-1"), y = lag))+ geom_point()
+for (varname in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM","TED","CISS","ADS")){
 
-lasso_lags[["ADS"]] %>%  ggplot()+
-  geom_bar(aes(x = lag, fill = as.Date(date,origin="1970-1-1")), position = "dodge", stat = "count") 
-
-LASSO_select %>%  ggplot()+
-  geom_bar(aes(x = lag, fill = as.Date(date,origin="1970-1-1")), position = "dodge", stat = "count") 
-
-
-
-
-banner("Parte 3:", "Nowcasting financial indicators", emph = TRUE)
-###########################################################################
-###########################################################################
-###                                                                     ###
-###                              PARTE 3:                               ###
-###                   NOWCASTING FINANCIAL INDICATORS                   ###
-###                                                                     ###
-###########################################################################
-###########################################################################
-
-
-Tini=80 #2006-Q4
-Tbig=length(y)
-Ttau=Tbig-Tini+1  
-
-
-#for (varname in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM","TED","CISS")){
-
-for (varname in c("CSPREAD")){
-  
-g=2 # col GDP vintage init
-j=3 # col ADS vintage init
- 
+  g=2 # col GDP vintage init
+  j=3 # col ADS vintage init
    
   for (t in (Tini:(length(y)-1))){
     
@@ -280,10 +180,21 @@ j=3 # col ADS vintage init
     #matching daily dates for nowcasting
     for (day in 1:length(q_t)){
       
-      data_update=data[which(data$date<=q_t_1[day]),c("q_n",varname)]
-      fin_1=daily_matrix(data_d=data_update, #t+4 (1 year daily lags)
-                         N_lag=93,data_names=c(varname,"q_n"),q_data=t+1)$daily
-      fin_1=scale(fin_1)
+      if (varname=="ADS"){
+        while (is.na(ADS_vintages[which(ADS_vintages$date==q_t_1[day]),j])){
+          j=j+1
+        }
+        ADS_update_t_1=ADS_vintages[which(ADS_vintages$date<=q_t_1[day]),c(1,2,j)]
+        names(ADS_update_t_1)=c("q_n","date","ADS")
+        fin_1=daily_matrix(data_d=ADS_update_t_1, #t+4 (1 year daily lags)
+                           N_lag=93,data_names=c("ADS","q_n"),q_data=t+1)$daily
+        fin_1=scale(fin_1)
+      } else {
+        data_update=data[which(data$date<=q_t_1[day]),c("q_n",varname)]
+        fin_1=daily_matrix(data_d=data_update, #t+4 (1 year daily lags)
+                           N_lag=93,data_names=c(varname,"q_n"),q_data=t+1)$daily
+        fin_1=scale(fin_1)
+      }
       
       while (is.na(rGDP_vintages[t,g])){
         g=g+1
@@ -313,9 +224,12 @@ j=3 # col ADS vintage init
 }
 
 
-#yEN<-cbind("q_n"=data$q_n[data$q_n>=85],yEN)
-#GDP_real<-cbind("q_n" = seq(85,140),GDP_real[81:136,])
-#yEN<-merge.data.frame(yEN,GDP_real[,c("q_n","GDP_real")],by = "q_n")
+yLASSO<-cbind("q_n"=data$q_n[data$q_n>=85],yLASSO)
+GDP_real<-cbind("q_n" = seq(85,140),GDP_real[81:136,])
+yLASSO<-merge.data.frame(yLASSO,GDP_real[,c("q_n","GDP_real")],by = "q_n")
+
+plot(yLASSO[,"ADS"],t="l")
+lines(yLASSO[,"GDP_real"],t="l",col=2)
 
 save(lasso_lags,file = "Data/lasso_lags.RData")
 write.csv(yLASSO, file = paste0("Data/nowcasting_LASSO",".csv"))
