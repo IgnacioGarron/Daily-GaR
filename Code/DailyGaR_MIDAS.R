@@ -107,7 +107,6 @@ Tini=80 #2006-Q4
 Tbig=length(y)
 Ttau=Tbig-Tini+1  
 
-c(ISPREAD,EEFR,RET,SMB,HML,MOM,VXO,CSPREAD,TERM,TED,CISS)
 
 yMIDAS<-data.frame(date=data[which(data$q_n>=Tini+4+1),"date"])
 yMIDAS<-cbind(yMIDAS,"ISPREAD"=NA,"EEFR"=NA,"RET"=NA,"SMB"=NA
@@ -135,16 +134,16 @@ for (t in (1:(length(y)+4))){
 
 #### Real time GDP
 
+#### Real time GDP
+
 g=2
 for (t in (1:length(y))){   
   ##incorporating latest vintage of GDP
-    while (is.na(GDP_vintages[t,g])){
-      g=g+1
-    }
-    GDP_real[t,2]=GDP_vintages[t,g]
+  while (is.na(rGDP_vintages[t,g])){
+    g=g+1
   }
-
-plot(GDP_real$GDP_real,t="l")
+  GDP_real[t,2]=rGDP_vintages[t,g]
+}
 
 #write.csv(ADS_real, file = paste0("Data/ADS_real",".csv"))
 
@@ -272,10 +271,13 @@ for (varname in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM
 }
 }
 
+yMIDAS<-cbind("q_n"=data$q_n[data$q_n>=85],yMIDAS)
 
-write.csv(cbind("q_n"=data$q_n[data$q_n>=85],yMIDAS), file = paste0("Data/nowcasting_MIDAS",".csv"))
+GDP_real<-cbind("q_n" = seq(85,140),GDP_real[81:136,])
 
+yMIDAS<-merge.data.frame(yMIDAS,GDP_real[,c("q_n","GDP_real")],by = "q_n")
 
+write.csv(yMIDAS, file = paste0("Data/nowcasting_MIDAS",".csv"))
 
-yMIDAS %>% pivot_longer(names_to = "nowcasts",values_to = "val",cols = -c(date)) %>% 
+yMIDAS %>% pivot_longer(names_to = "nowcasts",values_to = "val",cols = -c(date,q_n)) %>% 
   ggplot(aes(x=date,y=val,col=nowcasts))+geom_line()
