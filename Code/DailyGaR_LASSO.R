@@ -233,5 +233,5 @@ lines(yLASSO[,"GDP_real"],t="l",col=2)
 
 save(lasso_lags,file = "Data/lasso_lags.RData")
 write.csv(yLASSO, file = paste0("Data/nowcasting_LASSO",".csv"))
-write.csv(LASSO_select, file = paste0("Data/EN_LASSO",".csv"))
+write.csv(LASSO_select, file = paste0("Data/LASSO_select",".csv"))
 
