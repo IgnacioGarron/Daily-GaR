@@ -157,8 +157,8 @@ g=2 # col GDP vintage init
 j=3 # col ADS vintage init
 #158
 #for (t in (130:(length(y)-1))){
-for (t in (Tini:(length(y)-1))){
-  
+#for (t in (Tini:(length(y)-1))){
+for (t in (length(y)-1)){  
   #matching daily dates for nowcast
   q_t = data[which(data$q_n==(t+4)),"date"]
   q_t_1 = data[which(data$q_n==(t+4+1)),"date"]
@@ -203,25 +203,34 @@ for (t in (Tini:(length(y)-1))){
     I=diag(ncol(XX))*sqrt(lambda2)
     O=rep(0,ncol(XX))
     y_plus=c(gdp,O)
-    x_plus=rbind(XX[1:t,],I)*(1/sqrt(1+lambda2))
+    x_plus=rbind(fin_1[1:t,],I)*(1/sqrt(1+lambda2))
     lambda1=(1/sqrt(1+lambda2))*lambda.BC(XX[1:t,],c = 1,alpha=0.10,tau=0.10)
+    LassoLambdaHat(XX,tau = .10,alpha = .10)
+    lambdalasso=lambda.BC(fin_1[1:t,],c = 1,alpha=0.10,tau=0.10)
     
-#    lambdalasso=lambda.BC(XX[1:t,],c = 1,alpha=0.10,tau=0.10)
-    
-    #LASSO
- #   beta=rq(gdp[1:t] ~ lgdp[1:t]+fin_1[1:t,], tau = 0.10,method = "lasso",lambda=lambdalasso)$coefficients
-#    length(fin_1[1,abs(beta[-2:-1])>10^{-6}])
-    
+    #post-penalized LASSO (select then estimate canonical quantile reg as Belloni and Cherno)
+    beta=rqss(gdp[1:t] ~ fin_1[1:t,], tau = 0.10,method = "lasso",lambda=lambdalasso)$coefficients
+    seles=fin_1
+    lasso_I=abs(beta[-1])>10^{-6}
+    plot(beta)
+    gg=data.frame(cbind("date"=q_t_1[day],lasso_I))
+    data.frame(cbind("date"=q_t_1[day],which(abs(beta[-1])>10^{-6})))
     #EN
     beta=rqss(y_plus ~ x_plus, tau = 0.10,method = "lasso",lambda=lambda1)$coefficients
-    beta=beta*sqrt(1+lambda2)
+    beta=beta*(1+lambda2)
+    length(fin_1[1,abs(beta[-2:-1])>10^{-6}])
     II2=abs(beta[-2:-1])>10^{-6} #sam4e as Belloni and Cherno (2011)
     EN_select[EN_select$date==q_t_1[day],"ADS"]=length(fin_1[1,abs(beta[-2:-1])>10^{-6}])
     # estimate at t+1
     yEN[yEN$date==q_t_1[day],"ADS"]=c(beta[1:2],beta[-2:-1][II2])%*%c(1,lgdp[t+1],as.matrix(subset(fin_1,select=II2))[(t+1),])
     
   }
+  gg=data.frame(cbind("date"=q_t[day],which(abs(beta[-1])>10^{-6})))
+  gg$date=as.Date(gg$date,origin="1970-1-1")
+  s_lasso=gg
+  s_lasso=rbind(s_lasso,gg)
 }
+
 
 
 #prueba=rq(gdp[1:(t)]~lgdp[1:(t)]+fin_1[1:(t),], tau = 0.10,method = "lasso",lambda=(1/(sqrt(1+lambda2_1)*(t-1)))*LassoLambdaHat(XX[1:t,],alpha=0.10,tau=0.10))$coefficients
@@ -243,11 +252,12 @@ Tbig=length(y)
 Ttau=Tbig-Tini+1  
 
 
-g=2 # col GDP vintage init
-j=3 # col ADS vintage init
+
 for (varname in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM","TED","CISS")){
 
 #for (varname in c("TERM","TED","CISS")){
+  g=2 # col GDP vintage init
+  j=3 # col ADS vintage init
   
   for (t in (Tini:(length(y)-1))){
     
@@ -298,8 +308,8 @@ for (varname in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM
       
       #EN
       beta=rq(y_plus ~ x_plus, tau = 0.10,method = "lasso",lambda=lambda1)$coefficients
-      beta=beta*sqrt(1+lambda2)
-      II2=abs(beta[-2:-1])>10^{-6} #sam4e as Belloni and Cherno (2011)
+      beta=beta*(1+lambda2)
+      II2=abs(beta[-2:-1])>10^{-6} #same as Belloni and Cherno (2011)
       EN_select[EN_select$date==q_t_1[day],varname]=length(fin_1[1,abs(beta[-2:-1])>10^{-6}])
       # estimate at t+1
       yEN[yEN$date==q_t_1[day],varname]=c(beta[1:2],beta[-2:-1][II2])%*%c(1,lgdp[t+1],as.matrix(subset(fin_1,select=II2))[(t+1),])
@@ -320,7 +330,9 @@ plot(yEN[,"ADS"],t="l")
 lines(yEN[,"GDP_real"],t="l",col ="blue")
 
 
-write.csv(yEN, file = paste0("Data/nowcasting_EN",".csv"))
+#write.csv(yEN, file = paste0("Data/nowcasting_EN",".csv"))
+
+#write.csv(EN_select, file = paste0("Data/EN_select",".csv"))
 
 #write.csv(y, file = paste0("Data/nowcasting_LASSO",".csv"))
 
@@ -329,4 +341,5 @@ plot(yLASSO[,"GDP_real"],t="l")
 lines(yLASSO[,"CISS"],t="l",col ="blue")
 
 
+read_csv("Data/EN_select.csv")
 
