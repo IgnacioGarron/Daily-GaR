@@ -95,12 +95,13 @@ ADS_vintages=cbind("date"=data$date,ADS_vintages)
 ADS_vintages=cbind("q_n"=data$q_n,ADS_vintages)
 str(ADS_vintages)
 
-banner("Parte 2:", "Nowcasting ADS", emph = TRUE)
+
+banner("Parte 2:", "Nowcasting GaR EN", emph = TRUE)
 ############################################################################
 ############################################################################
 ###                                                                      ###
 ###                               PARTE 2:                               ###
-###                            NOWCASTING ADS                            ###
+###                         NOWCASTING GAR EN                            ###
 ###                                                                      ###
 ############################################################################
 ############################################################################
@@ -109,7 +110,6 @@ Tini=80 #2006-Q4
 Tbig=length(y)
 Ttau=Tbig-Tini+1  
 
-c(ISPREAD,EEFR,RET,SMB,HML,MOM,VXO,CSPREAD,TERM,TED,CISS)
 
 yEN<-data.frame(date=data[which(data$q_n>=Tini+4+1),"date"])
 yEN<-cbind(yEN,"ISPREAD"=NA,"EEFR"=NA,"RET"=NA,"SMB"=NA
@@ -117,10 +117,18 @@ yEN<-cbind(yEN,"ISPREAD"=NA,"EEFR"=NA,"RET"=NA,"SMB"=NA
               "CSPREAD"=NA,"TERM"=NA,"TED"=NA,"CISS"=NA,
               "ADS"=NA)
 EN_select<-yEN
+
 ADS_real<-data.frame(date=data[,"date"])
 ADS_real<-cbind(ADS_real,"ADS_real"=NA)
 GDP_real<-data.frame(date=date)
 GDP_real<-cbind(GDP_real,"GDP_real"=NA)
+EN_lags<-list()
+for (i in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO",
+            "CSPREAD","TERM","TED","CISS",
+            "ADS")){
+  EN_lags[[i]]<-data.frame(matrix(nrow=1,ncol=2))
+  colnames(EN_lags[[i]])<-c("date","lag")
+}
 
 #### Real time ADS
 
@@ -149,113 +157,9 @@ for (t in (1:length(y))){
 
 plot(GDP_real$GDP_real,t="l")
 
-#write.csv(ADS_real, file = paste0("Data/ADS_real",".csv"))
-
-#### Nowcasting for ADS
-
-g=2 # col GDP vintage init
-j=3 # col ADS vintage init
-#158
-#for (t in (130:(length(y)-1))){
-#for (t in (Tini:(length(y)-1))){
-for (t in (length(y)-1)){  
-  #matching daily dates for nowcast
-  q_t = data[which(data$q_n==(t+4)),"date"]
-  q_t_1 = data[which(data$q_n==(t+4+1)),"date"]
-  k=length(q_t_1)-length(q_t)
-  if (k==1){q_t=c(q_t,q_t[length(q_t)])}
-  else if (k==2){q_t=c(q_t,q_t[length(q_t)-1],q_t[length(q_t)])}
-  else if (k==3){q_t=c(q_t,q_t[length(q_t)-2],q_t[length(q_t)-1],q_t[length(q_t)])}
-  else if (k==-1){q_t=q_t[-length(q_t)]}
-  else if (k==-2){q_t=q_t[-(length(q_t)-1):-length(q_t)]}
-  print(k)
-  print(q_t[length(q_t)])
-  #print(length(q_t))
-  print(q_t_1[length(q_t_1)])
-  #print(length(q_t_1))
-  print(length(q_t_1)-length(q_t))
-  #matching daily dates for nowcasting
-  for (day in 1:length(q_t)){
-    ### Create daily matrix
-    ##incorporating latest vintage
-    ### Create daily matrix
-    while (is.na(ADS_vintages[which(ADS_vintages$date==q_t_1[day]),j])){
-      j=j+1
-    }
-    ADS_update_t_1=ADS_vintages[which(ADS_vintages$date<=q_t_1[day]),c(1,2,j)]
-    names(ADS_update_t_1)=c("q_n","date","ADS")
-    fin_1=daily_matrix(data_d=ADS_update_t_1, #t+4 (1 year daily lags)
-                       N_lag=93,data_names=c("ADS","q_n"),q_data=t+1)$daily
-    fin_1=scale(fin_1)
-    ### Estimate regression at t
-    
-    # GDP vintage at t
-    while (is.na(rGDP_vintages[t,g])){
-      g=g+1
-    }
-    gdp=rGDP_vintages[(1:t),g]
-    lgdp=lrGDP_vintages[1:(t+1),g]
-    
-    # estimate at t
-    #LAMBDA 2 FOR EN
-    XX=cbind(lgdp,fin_1)
-    lambda2=cv.glmnet(XX[1:t,],gdp[1:(t)],alpha=0.5)$lambda.min
-    I=diag(ncol(XX))*sqrt(lambda2)
-    O=rep(0,ncol(XX))
-    y_plus=c(gdp,O)
-    x_plus=rbind(fin_1[1:t,],I)*(1/sqrt(1+lambda2))
-    lambda1=(1/sqrt(1+lambda2))*lambda.BC(XX[1:t,],c = 1,alpha=0.10,tau=0.10)
-    LassoLambdaHat(XX,tau = .10,alpha = .10)
-    lambdalasso=lambda.BC(fin_1[1:t,],c = 1,alpha=0.10,tau=0.10)
-    
-    #post-penalized LASSO (select then estimate canonical quantile reg as Belloni and Cherno)
-    beta=rqss(gdp[1:t] ~ fin_1[1:t,], tau = 0.10,method = "lasso",lambda=lambdalasso)$coefficients
-    seles=fin_1
-    lasso_I=abs(beta[-1])>10^{-6}
-    plot(beta)
-    gg=data.frame(cbind("date"=q_t_1[day],lasso_I))
-    data.frame(cbind("date"=q_t_1[day],which(abs(beta[-1])>10^{-6})))
-    #EN
-    beta=rqss(y_plus ~ x_plus, tau = 0.10,method = "lasso",lambda=lambda1)$coefficients
-    beta=beta*(1+lambda2)
-    length(fin_1[1,abs(beta[-2:-1])>10^{-6}])
-    II2=abs(beta[-2:-1])>10^{-6} #sam4e as Belloni and Cherno (2011)
-    EN_select[EN_select$date==q_t_1[day],"ADS"]=length(fin_1[1,abs(beta[-2:-1])>10^{-6}])
-    # estimate at t+1
-    yEN[yEN$date==q_t_1[day],"ADS"]=c(beta[1:2],beta[-2:-1][II2])%*%c(1,lgdp[t+1],as.matrix(subset(fin_1,select=II2))[(t+1),])
-    
-  }
-  gg=data.frame(cbind("date"=q_t[day],which(abs(beta[-1])>10^{-6})))
-  gg$date=as.Date(gg$date,origin="1970-1-1")
-  s_lasso=gg
-  s_lasso=rbind(s_lasso,gg)
-}
 
 
-
-#prueba=rq(gdp[1:(t)]~lgdp[1:(t)]+fin_1[1:(t),], tau = 0.10,method = "lasso",lambda=(1/(sqrt(1+lambda2_1)*(t-1)))*LassoLambdaHat(XX[1:t,],alpha=0.10,tau=0.10))$coefficients
-
-
-
-banner("Parte 3:", "Nowcasting financial indicators", emph = TRUE)
-###########################################################################
-###########################################################################
-###                                                                     ###
-###                              PARTE 3:                               ###
-###                   NOWCASTING FINANCIAL INDICATORS                   ###
-###                                                                     ###
-###########################################################################
-###########################################################################
-
-Tini=80 #2006-Q4
-Tbig=length(y)
-Ttau=Tbig-Tini+1  
-
-
-
-for (varname in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM","TED","CISS")){
-
-#for (varname in c("TERM","TED","CISS")){
+for (varname in c("ADS","ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM","TED","CISS")){
   g=2 # col GDP vintage init
   j=3 # col ADS vintage init
   
@@ -265,11 +169,11 @@ for (varname in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM
     q_t = data[which(data$q_n==(t+4)),"date"]
     q_t_1 = data[which(data$q_n==(t+4+1)),"date"]
     k=length(q_t_1)-length(q_t)
-    if (k==1){q_t=c(q_t,q_t[length(q_t)])}
-    else if (k==2){q_t=c(q_t,q_t[length(q_t)-1],q_t[length(q_t)])}
-    else if (k==3){q_t=c(q_t,q_t[length(q_t)-2],q_t[length(q_t)-1],q_t[length(q_t)])}
-    else if (k==-1){q_t=q_t[-length(q_t)]}
-    else if (k==-2){q_t=q_t[-(length(q_t)-1):-length(q_t)]}
+    if (k==1){q_t=c(q_t,q_t[length(q_t)])
+    }else if (k==2){q_t=c(q_t,q_t[length(q_t)-1],q_t[length(q_t)])
+    }else if (k==3){q_t=c(q_t,q_t[length(q_t)-2],q_t[length(q_t)-1],q_t[length(q_t)])
+    }else if (k==-1){q_t=q_t[-length(q_t)]
+    }else if (k==-2){q_t=q_t[-(length(q_t)-1):-length(q_t)]}
     print(k)
     print(q_t[length(q_t)])
     #print(length(q_t))
@@ -279,67 +183,66 @@ for (varname in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM
     #matching daily dates for nowcasting
     for (day in 1:length(q_t)){
       
-      data_update=data[which(data$date<=q_t_1[day]),c("q_n",varname)]
-      fin_1=daily_matrix(data_d=data_update, #t+4 (1 year daily lags)
-                         N_lag=93,data_names=c(varname,"q_n"),q_data=t+1)$daily
-      fin_1=scale(fin_1)
+      if (varname=="ADS"){
+        while (is.na(ADS_vintages[which(ADS_vintages$date==q_t_1[day]),j])){
+          j=j+1
+        }
+        ADS_update_t_1=ADS_vintages[which(ADS_vintages$date<=q_t_1[day]),c(1,2,j)]
+        names(ADS_update_t_1)=c("q_n","date","ADS")
+        fin_1=daily_matrix(data_d=ADS_update_t_1, #t+4 (1 year daily lags)
+                           N_lag=93,data_names=c("ADS","q_n"),q_data=t+1)$daily
+        fin_1=scale(fin_1)
+      } else {
+        data_update=data[which(data$date<=q_t_1[day]),c("q_n",varname)]
+        fin_1=daily_matrix(data_d=data_update, #t+4 (1 year daily lags)
+                           N_lag=93,data_names=c(varname,"q_n"),q_data=t+1)$daily
+        fin_1=scale(fin_1)
+      }
       
       while (is.na(rGDP_vintages[t,g])){
         g=g+1
       }
       gdp=rGDP_vintages[(1:t),g]
       lgdp=scale(lrGDP_vintages[1:(t+1),g])
-
-      # estimate at t
+      
+      # estimate at t penalized EN
       #LAMBDA 2 FOR EN
-      XX=cbind(lgdp,fin_1)
+      XX=cbind(lgdp[1:(t)],fin_1[1:(t),])
       lambda2=cv.glmnet(XX[1:t,],gdp[1:(t)],alpha=0.5)$lambda.min
       I=diag(ncol(XX))*sqrt(lambda2)
       O=rep(0,ncol(XX))
       y_plus=c(gdp,O)
       x_plus=rbind(XX[1:t,],I)*(1/sqrt(1+lambda2))
-      lambda1=(1/sqrt(1+lambda2))*lambda.BC(XX[1:t,],c = 1,alpha=0.10,tau=0.10)
-      
-      #    lambdalasso=lambda.BC(XX[1:t,],c = 1,alpha=0.10,tau=0.10)
-      
-      #LASSO
-      #   beta=rq(gdp[1:t] ~ lgdp[1:t]+fin_1[1:t,], tau = 0.10,method = "lasso",lambda=lambdalasso)$coefficients
-      #    length(fin_1[1,abs(beta[-2:-1])>10^{-6}])
-      
-      #EN
-      beta=rq(y_plus ~ x_plus, tau = 0.10,method = "lasso",lambda=lambda1)$coefficients
-      beta=beta*(1+lambda2)
-      II2=abs(beta[-2:-1])>10^{-6} #same as Belloni and Cherno (2011)
-      EN_select[EN_select$date==q_t_1[day],varname]=length(fin_1[1,abs(beta[-2:-1])>10^{-6}])
+      lambdaEN=(1/sqrt(1+lambda2))*lambda.BC(XX[1:t,],c = 1,alpha=0.10,tau=0.10)
+      # EN select
+      beta_EN=rqss(y_plus~x_plus, tau = 0.10,method = "lasso",lambda=lambdaEN)$coefficients
+      EN_I=abs(beta_EN[-2:-1])>10^{-6}
+      if (length(fin_1[1,abs(beta_EN[-2:-1])>10^{-6}])==0){
+        EN_I=rank(abs(beta_EN[-2:-1]))<2} # in case it does not select any
+      EN_select[EN_select$date==q_t_1[day],varname]=length(fin_1[1,abs(beta_EN[-2:-1])>10^{-6}])
+      # beta correction EN
+      beta=beta_EN*(1+lambda2)
       # estimate at t+1
-      yEN[yEN$date==q_t_1[day],varname]=c(beta[1:2],beta[-2:-1][II2])%*%c(1,lgdp[t+1],as.matrix(subset(fin_1,select=II2))[(t+1),])
-      
+      yEN[yEN$date==q_t_1[day],varname]=beta%*%c(1,lgdp[(t+1)],fin_1[(t+1),])
     }
+    gg=data.frame(cbind("date"=q_t[day],"lag"=-which(EN_I)+ncol(fin_1)))
+    gg$date=as.Date(gg$date,origin="1970-1-1")
+    EN_lags[[varname]]=rbind(EN_lags[[varname]],gg)
   }
 }
 
-
-#yEN<-cbind("q_n"=data$q_n[data$q_n>=85],yEN)
-#GDP_real<-cbind("q_n" = seq(85,140),GDP_real[81:136,])
-#yEN<-merge.data.frame(yEN,GDP_real[,c("q_n","GDP_real")],by = "q_n")
-
-plot(EN_select[,"ADS"])
-
+yEN<-cbind("q_n"=data$q_n[data$q_n>=85],yEN)
+GDP_real<-cbind("q_n" = seq(85,140),GDP_real[81:136,])
+yEN<-merge.data.frame(yEN,GDP_real[,c("q_n","GDP_real")],by = "q_n")
 
 plot(yEN[,"ADS"],t="l")
-lines(yEN[,"GDP_real"],t="l",col ="blue")
+lines(yEN[,"GDP_real"],t="l",col=2)
 
 
-#write.csv(yEN, file = paste0("Data/nowcasting_EN",".csv"))
-
-#write.csv(EN_select, file = paste0("Data/EN_select",".csv"))
-
-#write.csv(y, file = paste0("Data/nowcasting_LASSO",".csv"))
-
-
-plot(yLASSO[,"GDP_real"],t="l")
-lines(yLASSO[,"CISS"],t="l",col ="blue")
-
-
-read_csv("Data/EN_select.csv")
+#load("Data/EN_lags.RData")
+#yEN<-read_csv("Data/nowcasting_EN.csv")[,-1]
+#EN_select<-read_csv("Data/EN_select.csv")[,-1]
+save(EN_lags,file = "Data/EN_lags.RData")
+write.csv(yEN, file = paste0("Data/nowcasting_EN",".csv"))
+write.csv(EN_select, file = paste0("Data/EN_select",".csv"))
 
