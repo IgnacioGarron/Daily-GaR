@@ -11,11 +11,11 @@ seed_n<-12345
 
 
 
-plot<-read_csv("Data/LASSO_select.csv")
+plot<-read_csv("Data/EN_select.csv")
 
 summary(plot[,-c(1,2,3)])
 
-plot[,-c(1)] %>% pivot_longer(names_to = "Variables",values_to = "val",cols = -c(date,q_n)) %>% 
+plot[,-c(1)] %>% pivot_longer(names_to = "Variables",values_to = "val",cols = -c(date)) %>% 
   ggplot(aes(x = date, y =val,col=Variables )) + geom_line() + facet_wrap(~Variables)+
   theme_bw() + 
   labs(x="", y="", title = "") + theme(legend.position="bottom")
