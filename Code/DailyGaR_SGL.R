@@ -4,21 +4,19 @@
 
 library(stats)
 library(quantreg)
-library(grDevices)
 #library(sROC)
 library(quadprog)
 library(psych)
 library(forecast)
 library(elasticnet)
 library(glmnet)
-library(normtest)
 library(readxl)            # read excel
 library(tidyverse)
 library(bannerCommenter) # Baners
-library(GAS) # backtesting VaR
 library(bayesQR)
 library(ggridges)
 library(ggpubr) # ggarrrange
+library(reticulate) # RUN PYTHON FROM R
 
 banner("Parte 1:", "Procesamiento de la base de datos", emph = TRUE)
 ###########################################################################
@@ -36,10 +34,6 @@ rm(list = ls()) # Limpiar environment
 setwd("/Users/ignaciogarronvedia/Documents/GitHub/Daily-GaR")
 set.seed(12345)
 seed_n<-12345
-
-source("Code/almon_lag.R") # Almon Lag with two end point restrictions as in Mogliani and Simoni (2021)
-source("Code/dailymatrix.R") # Almon Lag with two end point restrictions as in Mogliani and Simoni (2021)
-source("Code/lambda_lasso.R") # Lambda lasso
 
 
 ####### Quarterly GDP Data Import #######
@@ -92,7 +86,7 @@ str(ADS_vintages)
 
 
 
-banner("Parte 2:", "Nowcasting GaR LASSO", emph = TRUE)
+Sbanner("Parte 2:", "Nowcasting GaR GSL", emph = TRUE)
 ############################################################################
 ############################################################################
 ###                                                                      ###
@@ -151,22 +145,78 @@ for (t in (1:length(y))){
   GDP_real[t,2]=rGDP_vintages[t,g]
 }
 
-plot(GDP_real$GDP_real,t="l")
 
 
-library("reticulate") # DUN PYTHON FROM R
 
-reticulate::use_python("/Users/ignaciogarronvedia/opt/anaconda3/envs/cvxpy_env/bin/python")
 
-reticulate::conda_list()
-
-use_condaenv("cvxpy_env", required = TRUE)
-
-py_config()
+np<-import("numpy", convert = FALSE)
 asgl<-import("asgl")
+sk<-import("sklearn.datasets")
+
+j=1
+data_update=data[,c("q_n","ISPREAD")]
+fin_1=daily_matrix(data_d=data_update, #t+4 (1 year daily lags)
+                   N_lag=93,data_names=c("ISPREAD","q_n"),q_data=136)$daily
+fin=fin_1
+gg = c(rep(j,j,ncol(fin_1)))
+
+for (varname in c("EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM","TED","ADS")){
+j=j+1
+    data_update=data[,c("q_n",varname)]
+  fin_1=daily_matrix(data_d=data_update, #t+4 (1 year daily lags)
+                     N_lag=93,data_names=c(varname,"q_n"),q_data=136)$daily
+  fin=cbind(fin,fin_1)
+  gg=c(gg,rep(j,j,ncol(fin_1)))
+}
+
+# Numpy arrays
+XX = as.array(scale(fin))
+YY = as.array(GDP_real[,2])
+
+class(XX)
+class(YY)
+class(gg)
+
+# Define parameters grid
+lambda1 = as.array(10.0^seq(-3, 1.51, 0.2)) # 23 possible values for lambda
+alpha = as.array(seq(0, 1, 0.05)) # 20 possible values for alpha
 
 
+# Define model parameters
+model = 'qr'  # linear model
+penalization = 'sgl'  # sparse group lasso penalization
+parallel = T  # Code executed in parallel
+error_type = 'QRE'  # Error measuremente considered. MSE stands for Mean Squared Error.
+tau = 0.10
 
+# Define a cross validation object
+cv_class <- asgl$CV(model=model, penalization=penalization, 
+                   lambda1=lambda1, alpha=alpha, error_type=error_type, 
+                   parallel=parallel, random_state=np_array(99,dtype = "int64"))
+
+lambda1+1
+# Compute error using k-fold cross validation
+error<-cv_class$cross_validation(x=XX, y=YY, group_index=gg)
+
+
+# Obtain the mean error across different folds
+error1 = rowMeans(error)
+# Select the minimum error
+minimum_error_idx = np$argmin(error1)
+
+# Select the parameters associated to mininum error values
+optimal_parameters = cv_class$retrieve_parameters_value(minimum_error_idx)
+
+lambda_star=optimal_parameters$lambda1
+alpha_star=optimal_parameters$alpha
+# Define asgl class using optimal values
+asgl_model <- asgl$ASGL(model=model, penalization=penalization, 
+                       lambda1=optimal_parameters$lambda1,
+                       alpha=optimal_parameters$alpha,tau = tau)
+
+asgl_model$fit(x = XX, y = YY, group_index = gg)
+
+asgl_model$coef_
 
 for (varname in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM","TED","CISS","ADS")){
   
