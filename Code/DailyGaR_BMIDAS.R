@@ -313,3 +313,4 @@ write.csv(yBMIDAS, file = paste0("Data/nowcasting_BMIDAS",".csv"))
 yBMIDAS %>% pivot_longer(names_to = "nowcasts",values_to = "val",cols = -c(date,q_n)) %>% 
   ggplot(aes(x=date,y=val,col=nowcasts))+geom_line()
 
+
