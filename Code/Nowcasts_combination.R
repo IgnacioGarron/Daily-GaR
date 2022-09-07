@@ -105,6 +105,13 @@ w3<-weigths_c[["LASSO"]] %>% pivot_longer(names_to = "Variables",
   scale_fill_viridis_d()+ theme_light()+
   xlab("c) LASSO-Q")+ylab("")
 
+w3i<-weigths_c[["LASSO"]] %>% pivot_longer(names_to = "Variables",
+                                          values_to = "value",
+                                          cols = -c(1)) %>% 
+  ggplot(aes(x=as.Date(date),y=value,fill=Variables)) + geom_area()+
+  scale_fill_viridis_d()+ theme_light()+
+  xlab("")+ylab("")
+
 w4<-weigths_c[["EN"]] %>% pivot_longer(names_to = "Variables",
                                           values_to = "value",
                                           cols = -c(1)) %>% 
@@ -130,6 +137,10 @@ w6<-weigths_c[["ENPCA"]] %>% pivot_longer(names_to = "Variables",
 ggsave(paste0("Figures/weights",".png"),
        ggarrange(w1,w2,w3,w4,w5,w6,ncol = 2,nrow=3,
                  common.legend = T,legend = "bottom"), width = 8, height = 10)
+
+ggsave(paste0("Figures/weightslasso",".png"),
+       ggarrange(w3i,ncol = 1,nrow=1,
+                 common.legend = T,legend = "bottom"), width = 8, height = 4)
 
 
 
