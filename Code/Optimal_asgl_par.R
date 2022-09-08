@@ -104,18 +104,25 @@ Tini=80 #2006-Q4
 Tbig=length(y)
 Ttau=Tbig-Tini+1  
 
-yASGL<-data.frame(date=data[which(data$q_n>=Tini+4+1),"date"])
-yASGL_GaR<-cbind(yASGL,"GaR"=NA)
-yASGL_W<-cbind("GDP(-1)"=NA,"ISPREAD"=NA,"EEFR"=NA,"RET"=NA,"SMB"=NA
-               ,"HML"=NA,"MOM"=NA,"VXO"=NA,
-               "CSPREAD"=NA,"TERM"=NA,"TED"=NA,
-               "ADS"=NA)
+
+ySGL<-data.frame(date=data[which(data$q_n>=Tini+4+1),"date"])
+ySGL<-cbind(ySGL,"ISPREAD"=NA,"EEFR"=NA,"RET"=NA,"SMB"=NA
+            ,"HML"=NA,"MOM"=NA,"VXO"=NA,
+            "CSPREAD"=NA,"TERM"=NA,"TED"=NA,"CISS"=NA,
+            "ADS"=NA)
+ySGL_select<-ySGL
 
 ADS_real<-data.frame(date=data[,"date"])
 ADS_real<-cbind(ADS_real,"ADS_real"=NA)
 GDP_real<-data.frame(date=date)
 GDP_real<-cbind(GDP_real,"GDP_real"=NA)
-
+ySGL_lags<-list()
+for (i in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO",
+            "CSPREAD","TERM","TED","CISS",
+            "ADS")){
+  ySGL_lags[[i]]<-data.frame(matrix(nrow=1,ncol=2))
+  colnames(ySGL_lags[[i]])<-c("date","lag")
+}
 
 #### Real time ADS
 
@@ -147,116 +154,92 @@ np<-import("numpy", convert = FALSE)
 asgl<-import("asgl")
 sk<-import("sklearn.datasets")
 
-  
-g=2 # col GDP vintage init
-j=3 # col ADS vintage init
+j=1
+data_update=data[,c("q_n","ISPREAD")]
+fin_1=daily_matrix(data_d=data_update, #t+4 (1 year daily lags)
+                   N_lag=93,data_names=c("ISPREAD","q_n"),q_data=136)$daily
+fin=fin_1
+gg = c(rep(j,j,ncol(fin_1)))
 
-for (t in (Tini:(length(y)-1))){
-#for (t in Tini){    
-  #matching daily dates for nowcast
-  q_t = data[which(data$q_n==(t+4)),"date"]
-  q_t_1 = data[which(data$q_n==(t+4+1)),"date"]
-  k=length(q_t_1)-length(q_t)
-  if (k==1){q_t=c(q_t,q_t[length(q_t)])
-  }else if (k==2){q_t=c(q_t,q_t[length(q_t)-1],q_t[length(q_t)])
-  }else if (k==3){q_t=c(q_t,q_t[length(q_t)-2],q_t[length(q_t)-1],q_t[length(q_t)])
-  }else if (k==-1){q_t=q_t[-length(q_t)]
-  }else if (k==-2){q_t=q_t[-(length(q_t)-1):-length(q_t)]}
-  print(k)
-  print(q_t[length(q_t)])
-  #print(length(q_t))
-  print(q_t_1[length(q_t_1)])
-  #print(length(q_t_1))
-  print(length(q_t_1)-length(q_t))
-  #matching daily dates for nowcasting
-  for (day in 1:length(q_t)){
-
-    k=2
-    data_update=data[which(data$date<=q_t_1[day]),c("q_n","ISPREAD")]
-    fin_1=daily_matrix(data_d=data_update, #t+4 (1 year daily lags)
-                       N_lag=93,data_names=c("ISPREAD","q_n"),q_data=t+1)$daily
-    fin=fin_1
-    gg = c(1,rep(k,k,ncol(fin_1)))
-    
-    for (varname in c("EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM","TED")){
-      k=k+1
-      data_update=data[which(data$date<=q_t_1[day]),c("q_n",varname)]
-      fin_1=daily_matrix(data_d=data_update, #t+4 (1 year daily lags)
-                         N_lag=93,data_names=c(varname,"q_n"),q_data=t+1)$daily
-      fin=cbind(fin,fin_1)
-      gg=c(gg,rep(k,k,ncol(fin_1)))
-    }
-      
-    for (varname in c("ADS")){
-      while (is.na(ADS_vintages[which(ADS_vintages$date==q_t_1[day]),j])){
-        j=j+1
-      }
-      k=k+1
-      ADS_update_t_1=ADS_vintages[which(ADS_vintages$date<=q_t_1[day]),c(1,2,j)]
-      names(ADS_update_t_1)=c("q_n","date","ADS")
-      fin_1=daily_matrix(data_d=ADS_update_t_1, #t+4 (1 year daily lags)
-                         N_lag=93,data_names=c("ADS","q_n"),q_data=t+1)$daily
-      fin=cbind(fin,fin_1)
-      gg=c(gg,rep(k,k,ncol(fin_1)))
-    }
-    
-    fin=scale(fin)
-    while (is.na(rGDP_vintages[t,g])){
-      g=g+1
-    }
-    gdp=rGDP_vintages[(1:t),g]
-    lgdp=scale(lrGDP_vintages[1:(t+1),g])
-  
-    # Numpy arrays
-    XX_t = as.array(cbind(lgdp[1:t],fin[1:t,]))
-    XX_t1 = as.array(cbind(lgdp,fin))
-    YY_t = as.array(gdp)
-    
-    # Obtain weight values
-    model='qr'
-    penalization = 'asgl'
-    weight_technique = 'pca_pct'
-    lasso_power_weight = as.array( 1)
-    gl_power_weight = as.array(1)
-    tau = 0.10
-    #variability_pct = 0.9
-    
-    weights = asgl$WEIGHTS(model=model, penalization=penalization, weight_technique=weight_technique, lasso_power_weight=lasso_power_weight, 
-                           gl_power_weight=gl_power_weight,tau = tau)
-    asgl_weigths= weights$fit(x=XX_t, y=YY_t, group_index=gg)
-    lasso_weigths=asgl_weigths[[1]]
-    gl_weigths=asgl_weigths[[2]]
-
-    lambda1=0.001 #0.001
-    alpha=0.25 #0.25
-    
-    # Fit class using optimal values
-    asgl_model = asgl$ASGL(model=model, penalization='asgl',lambda1=lambda1, alpha=alpha, 
-                           lasso_weights=lasso_weigths, gl_weights=gl_weigths, parallel=T,
-                           tau=tau)
-    
-    asgl_model$fit(x = XX_t, y = YY_t, group_index = gg)
-    asgl_model$coef_
-    pr<-asgl_model$predict(x_new=XX_t1)
-    print(pr[[1]][t+1])
-    yASGL_GaR[yASGL_GaR$date==q_t_1[day],"GaR"]=pr[[1]][t+1]
-    yASGL_W<-rbind(yASGL_W,t(as.matrix(gl_weigths[[1]])))
-  }
+for (varname in c("EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM","TED","ADS")){
+  j=j+1
+  data_update=data[,c("q_n",varname)]
+  fin_1=daily_matrix(data_d=data_update, #t+4 (1 year daily lags)
+                     N_lag=93,data_names=c(varname,"q_n"),q_data=136)$daily
+  fin=cbind(fin,fin_1)
+  gg=c(gg,rep(j,j,ncol(fin_1)))
 }
 
 
-yASGL_w<-cbind(data[data$q_n>=85,c("q_n","date")],(1/yASGL_W[-1,])/rowSums(1/yASGL_W[-1,]))
-yASGL_w2<-cbind(data[data$q_n>=85,c("q_n","date")],yASGL_W[-1,])
+# Numpy arrays
+XX = as.array(scale(fin))
+YY = as.array(GDP_real[,2])
 
-plot(yASGL[,"GaR"])
-cbind("q_n"=data$q_n[data$q_n>=85],yASGL_GaR)
-yASGL<-cbind("q_n"=data$q_n[data$q_n>=85],yASGL_GaR)
-GDP_real<-cbind("q_n" = seq(85,140),GDP_real[81:136,])
-yASGL<-merge.data.frame(yASGL,GDP_real[,c("q_n","GDP_real")],by = "q_n")
+class(XX)
+class(YY)
+class(gg)
 
-plot(yASGL[,"GaR"],t="l")
-lines(yASGL[,"GDP_real"],t="l",col=2)
 
-write.csv(yASGL, file = paste0("Data/nowcasting_ASGL",".csv"))
-write.csv(yASGL_w, file = paste0("Data/ASGL_gselect",".csv"))
-write.csv(yASGL_w2, file = paste0("Data/ASGL_gselect_raw",".csv"))
+# Obtain weight values
+model='qr'
+penalization = 'asgl'
+weight_technique = 'pca_pct'
+lasso_power_weight = as.array( 1)
+gl_power_weight = as.array(1)
+tau = 0.10
+#variability_pct = 0.9
+
+weights = asgl$WEIGHTS(model=model, penalization=penalization, weight_technique=weight_technique, lasso_power_weight=lasso_power_weight, 
+                       gl_power_weight=gl_power_weight,tau = tau)
+asgl_weigths= weights$fit(x=XX, y=YY, group_index=gg)
+
+lasso_weigths=asgl_weigths[[1]]
+gl_weigths=asgl_weigths[[2]]
+
+# Define model parameters for CV
+model = 'qr'  # linear model
+penalization = 'asgl'  # sparse group lasso penalization
+parallel = T  # Code executed in parallel
+error_type = 'QRE'  # Error measuremente considered. MSE stands for Mean Squared Error.
+tau = 0.10
+
+lambda1 = as.array(c(0.001, 0.01, 0.1, 1, 10)) # 4 possible values for lambda
+alpha = as.array(0.25, 0.5, 0.75, 1) # 20 possible values for alpha
+
+# Define a cross validation object
+cv_class <- asgl$CV(model=model, penalization=penalization, 
+                    lambda1=lambda1, alpha=alpha, error_type=error_type, 
+                    parallel=parallel, random_state=np_array(99,dtype = "int64"),
+                    weight_technique = "pls_pct",tau=tau)
+
+
+# Compute error using k-fold cross validation
+error<-cv_class$cross_validation(x=XX, y=YY, group_index=gg)
+
+
+# Obtain the mean error across different folds
+error1 = rowMeans(error)
+# Select the minimum error
+minimum_error_idx = np$argmin(error1)
+
+# Select the parameters associated to mininum error values
+optimal_parameters = cv_class$retrieve_parameters_value(minimum_error_idx)
+
+cv_class$retrieve_parameters_value(2)
+lambda1=optimal_parameters$lambda1 
+alpha=optimal_parameters$alpha
+
+lambda #0.001
+alpha #0.25
+
+# Fit class using optimal values
+asgl_model = asgl$ASGL(model=model, penalization='asgl',lambda1=lambda1, alpha=alpha, 
+                       lasso_weights=lasso_weigths, gl_weights=gl_weigths, parallel=T,
+                       tau=tau)
+
+asgl_model$fit(x = XX, y = YY, group_index = gg)
+asgl_model$coef_
+pr<-asgl_model$predict(x_new=XX)
+plot(YY)
+lines(pr[[1]],t="l",col=2)
+
