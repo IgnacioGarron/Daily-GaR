@@ -37,7 +37,7 @@ g11<-lagplot(varname="CISS",data=lasso_lags)
 g12<-lagplot(varname="ADS",data=lasso_lags)
 
 
-ggsave(paste0("Figures/LASSO_lags",".png"),
+ggsave(paste0("Figures/LASSO_lags",".jpg"),
        ggarrange(g1,g2,g3,g4,g5,g6,g7,g8,g9,g10,g11,g12,ncol = 2,nrow=6), width = 8, height = 10)
 
 g1<-lagplot(varname="ISPREAD",data=EN_lags)
@@ -54,6 +54,6 @@ g11<-lagplot(varname="CISS",data=EN_lags)
 g12<-lagplot(varname="ADS",data=EN_lags)
 
 
-ggsave(paste0("Figures/EN_lags",".png"),
+ggsave(paste0("Figures/EN_lags",".jpg"),
        ggarrange(g1,g2,g3,g4,g5,g6,g7,g8,g9,g10,g11,g12,ncol = 2,nrow=6), width = 8, height = 10)
 

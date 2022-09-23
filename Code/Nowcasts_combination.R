@@ -89,14 +89,14 @@ w1<-weigths_c[["MIDAS"]] %>% pivot_longer(names_to = "Variables",
                                             cols = -c(1)) %>% 
   ggplot(aes(x=as.Date(date),y=value,fill=Variables)) + geom_area()+
   scale_fill_viridis_d()+ theme_light()+
-  xlab("a) MIDAS")+ylab("")
+  xlab("a) MIDAS-Q")+ylab("")
 
 w2<-weigths_c[["BMIDAS"]] %>% pivot_longer(names_to = "Variables",
                                           values_to = "value",
                                           cols = -c(1)) %>% 
   ggplot(aes(x=as.Date(date),y=value,fill=Variables)) + geom_area()+
   scale_fill_viridis_d()+ theme_light()+
-  xlab("b) BMIDAS")+ylab("")
+  xlab("b) BMIDAS-Q")+ylab("")
 
 w3<-weigths_c[["LASSO"]] %>% pivot_longer(names_to = "Variables",
                                           values_to = "value",
@@ -134,11 +134,11 @@ w6<-weigths_c[["ENPCA"]] %>% pivot_longer(names_to = "Variables",
   xlab("f) EN-PCA-Q")+ylab("")
 
 
-ggsave(paste0("Figures/weights",".png"),
+ggsave(paste0("Figures/Figure A3",".jpg"),
        ggarrange(w1,w2,w3,w4,w5,w6,ncol = 2,nrow=3,
                  common.legend = T,legend = "bottom"), width = 8, height = 10)
 
-ggsave(paste0("Figures/weightslasso",".png"),
+ggsave(paste0("Figures/weightslasso",".jpg"),
        ggarrange(w3i,ncol = 1,nrow=1,
                  common.legend = T,legend = "bottom"), width = 8, height = 4)
 

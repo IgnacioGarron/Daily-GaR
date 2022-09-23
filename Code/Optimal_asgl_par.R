@@ -105,24 +105,18 @@ Tbig=length(y)
 Ttau=Tbig-Tini+1  
 
 
-ySGL<-data.frame(date=data[which(data$q_n>=Tini+4+1),"date"])
-ySGL<-cbind(ySGL,"ISPREAD"=NA,"EEFR"=NA,"RET"=NA,"SMB"=NA
+yASGL<-data.frame(date=data[which(data$q_n>=Tini+4+1),"date"])
+yASGL_GaR<-cbind(yASGL,"GaR"=NA)
+yASGL_W<-cbind("GDP(-1)"=NA,"ISPREAD"=NA,"EEFR"=NA,"RET"=NA,"SMB"=NA
             ,"HML"=NA,"MOM"=NA,"VXO"=NA,
             "CSPREAD"=NA,"TERM"=NA,"TED"=NA,"CISS"=NA,
             "ADS"=NA)
-ySGL_select<-ySGL
 
 ADS_real<-data.frame(date=data[,"date"])
 ADS_real<-cbind(ADS_real,"ADS_real"=NA)
 GDP_real<-data.frame(date=date)
 GDP_real<-cbind(GDP_real,"GDP_real"=NA)
-ySGL_lags<-list()
-for (i in c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO",
-            "CSPREAD","TERM","TED","CISS",
-            "ADS")){
-  ySGL_lags[[i]]<-data.frame(matrix(nrow=1,ncol=2))
-  colnames(ySGL_lags[[i]])<-c("date","lag")
-}
+
 
 #### Real time ADS
 

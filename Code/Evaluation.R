@@ -17,7 +17,7 @@ colnames(Table1a)<-c("h_d=0","","h_d=10","",
                     "h_d=20","","h_d=40","",
                     "h_d=60","")
 rnames<-c("GaR-MIDAS","GaR-BMIDAS","GaR-LASSO","GaR-EN","GaR-LASSO-PCA",
-          "GaR-EN-PCA","GaR-SGLASSO")
+          "GaR-EN-PCA","GaR-ASGL")
 row.names(Table1a)<-rnames
 
 Table1b=Table1a
@@ -25,24 +25,30 @@ Table1c=Table1a
 Table1d=Table1a
 
 j=0
-MM<-c("MIDAS","BMIDAS","LASSO","EN","LASSOPCA","ENPCA")
+MM<-c("MIDAS","BMIDAS","LASSO","EN","LASSOPCA","ENPCA","ASGL")
 for (m in MM){
-select<-c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM","TED","ADS")
-j=1+j
-y<-read.csv(paste0("Data/nowcasting_",m,".csv"))[,select]
+  if (m=="ASGL"){
+    j=1+j
+    y<-read.csv(paste0("Data/nowcasting_",m,".csv"))
+    yb<-read.csv(paste0("Data/nowcasting_LASSO.csv"))[,c("q_n","date","CISS")]
+    GDP_real<-read.csv(paste0("Data/nowcasting_",m,".csv"))[,c("q_n","date","GDP_real")]
+    GaR<-cbind(GDP_real,y$GaR,"GaRCISS"=yb$CISS)
+  }else{
+    select<-c("ISPREAD","EEFR","RET","SMB","HML","MOM","VXO","CSPREAD","TERM","TED","ADS")
+    j=1+j
+    y<-read.csv(paste0("Data/nowcasting_",m,".csv"))[,select]
+    
+    GDP_real<-read.csv(paste0("Data/nowcasting_",m,".csv"))[,c("q_n","date","GDP_real")]
+    yb<-read.csv(paste0("Data/nowcasting_",m,".csv"))[,c("q_n","date","CISS")]
+    w<-weigths_c[[m]][,select]
+    GaR<-y[,1]*w[,1]+y[,2]*w[,2]+y[,3]*w[,3]+y[,4]*w[,4]+y[,5]*w[,5]+y[,6]*w[,6]+
+      y[,7]*w[,7]+y[,8]*w[,8]+y[,9]*w[,9]+y[,10]*w[,10]+y[,11]*w[,11]
+    GaR<-cbind(GDP_real,GaR,"GaRCISS"=yb$CISS)
+  }
 
-GDP_real<-read.csv(paste0("Data/nowcasting_",m,".csv"))[,c("q_n","date","GDP_real")]
-yb<-read.csv(paste0("Data/nowcasting_",m,".csv"))[,c("q_n","date","CISS")]
-w<-weigths_c[[m]][,select]
-GaR<-y[,1]*w[,1]+y[,2]*w[,2]+y[,3]*w[,3]+y[,4]*w[,4]+y[,5]*w[,5]+y[,6]*w[,6]+
-  y[,7]*w[,7]+y[,8]*w[,8]+y[,9]*w[,9]+y[,10]*w[,10]+y[,11]*w[,11]
-
-GaR<-cbind(GDP_real,GaR,"GaRCISS"=yb$CISS)
-
-
-for (h in c(0,10,20,40,60)) {
+  for (h in c(0,10,20,40,60)) {
   
-  yy<-matrix(ncol=3,nrow=140-85+1)
+    yy<-matrix(ncol=3,nrow=140-85+1)
   
   for (x in 85:140){
     h_len=length(GaR[which(GaR$q_n==x),c(2)])
