@@ -295,7 +295,7 @@ yBMIDAS<-cbind("q_n"=data$q_n[data$q_n>=85],yBMIDAS)
 GDP_real<-cbind("q_n" = seq(85,140),GDP_real[81:136,])
 yBMIDAS<-merge.data.frame(yBMIDAS,GDP_real[,c("q_n","GDP_real")],by = "q_n")
 
-#some missing <1% of sample due to optim not sol. replaced with latest ob.
+#some missing <0.1% of sample due to optim not sol. replaced with latest ob.
 yBMIDAS<-fill(yBMIDAS,EEFR,.direction="down")
 yBMIDAS<-fill(yBMIDAS,SMB,.direction="down")
 yBMIDAS<-fill(yBMIDAS,HML,.direction="down")
