@@ -75,3 +75,7 @@ ggsave(paste0("Figures/weightsASGL",".jpg"),
                  common.legend = T,legend = "bottom"), width = 8, height = 4)
 
 
+# Importance around GFC
+apply(weigths_c$LASSO[weigths_c$LASSO$date>="2008-10-01" &
+                        weigths_c$LASSO$date<= "2009-04-01",-1],2,mean)
+
