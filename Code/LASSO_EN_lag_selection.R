@@ -36,6 +36,10 @@ g10<-lagplot(varname="TED",data=lasso_lags)
 g11<-lagplot(varname="CISS",data=lasso_lags)
 g12<-lagplot(varname="ADS",data=lasso_lags)
 
+ggsave(paste0("Figures/Presentation3lasso",".jpg"),
+       ggarrange(g7,g12,ncol = 2,nrow=1), width = 8, height = 4)
+
+
 
 ggsave(paste0("Figures/LASSO_lags",".jpg"),
        ggarrange(g1,g2,g3,g4,g5,g6,g7,g8,g9,g10,g11,g12,ncol = 2,nrow=6), width = 8, height = 10)
