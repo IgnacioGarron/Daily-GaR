@@ -2,8 +2,7 @@
 # Paper 2 PhD Thesis
 # Code: Ignacio Garrón Vedia, 2022
 
-## Daily Growth at Risk: financial or real drivers? The answer is not always the same
-## Helena Chuliá, Ignacio Garron, Jorge Uribe
+## Chuliá, H., Garrón, I., & Uribe, J. M. (2024). Daily growth at risk: Financial or real drivers? The answer is not always the same. International Journal of Forecasting, 40(2), 762-776.
 
 ## Abstract
 
